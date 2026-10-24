@@ -1,6 +1,6 @@
 [Unit]
 Description=MCShell Minecraft client
-Documentation=file://@REPO@/docs/testing.md
+Documentation=file://@REPO@/docs/troubleshooting.md
 PartOf=mcshell-session.target
 
 # The client reconnects on its own with backoff, so this is a preference about

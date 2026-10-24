@@ -90,3 +90,4 @@ session. See `daemon/tests/conftest.py`.
 
 Include the output of `mcshell check`, and if the session is running,
 `mcshell diagnose`.
+`docs/troubleshooting.md` may already have the answer.

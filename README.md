@@ -130,6 +130,7 @@ To use a terminal other than foot, put `TERMINAL=kitty` (or yours) in
   `~/.local/state/mcshell/session.log`
 - If MCShell won't start, pick your normal desktop on the login screen.
 
+More symptoms and fixes: [docs/troubleshooting.md](docs/troubleshooting.md).
 Include the output of `mcshell check` in bug reports.
 
 ## Uninstall
