@@ -133,6 +133,16 @@ class Daemon:
             if real and not (self.bin / name).exists():
                 (self.bin / name).symlink_to(real)
 
+        # MCSHELL_TEST_INSTALLED=<an extracted package> runs the same tests
+        # against what a package installs instead of against this checkout:
+        # its daemon from its site-packages, its tree as the root.
+        installed = os.environ.get("MCSHELL_TEST_INSTALLED")
+        if installed:
+            site = next(Path(installed).glob("usr/lib/python3*/site-packages"))
+            extra_env = {"PYTHONPATH": str(site),
+                         "MCSHELL_ROOT": str(Path(installed) / "usr/share/mcshell"),
+                         **extra_env}
+
         nobus = f"unix:path={root / 'no-such-bus'}"
         self.env = {
             "HOME": str(self.home),
