@@ -46,9 +46,9 @@ source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgv
         "$url/releases/download/v$pkgver/$pkgname-$pkgver.mrpack")
 noextract=("$pkgname-$pkgver.jar" "$pkgname-$pkgver.mrpack")
 # Filled from the published release with `updpkgsums`; see README.md here.
-sha256sums=('SKIP'
-            'SKIP'
-            'SKIP')
+sha256sums=('1460a34f8f0597892a336f1dddc80b5514dd1a762dd6be8325250c8a85a15744'
+            'b034bd62422a83fe2ba89ebae8658c62bf2a9e45cb6b77e992121f4c48d8d5c0'
+            'e3e4b80bf0738b8b7ceab81768742dc731aaf694ddf8322d65c6f7e46f9ac88b')
 
 build() {
   cd "$pkgname-$pkgver/daemon"

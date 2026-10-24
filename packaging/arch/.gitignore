@@ -1,0 +1,8 @@
+# What makepkg downloads and builds here.
+/mcshell-*.tar.gz
+/mcshell-*.jar
+/mcshell-*.mrpack
+/*.pkg.tar.*
+/*.log
+/src/
+/pkg/
