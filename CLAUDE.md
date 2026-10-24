@@ -124,6 +124,7 @@ mcshell/
 │   ├── check.py             # is this machine set up, and what is missing
 │   └── systemd/             # two units and a target, templated on the repo path
 ├── templates/               # the shipped worlds, made from the snapshots by build.py
+├── packaging/arch/          # the AUR package: PKGBUILD, and how a release reaches it
 └── docs/
     ├── protocol.md          # every message, in sync with protocol.py
     ├── design/              # one file per feature: the spec, and why it is so
