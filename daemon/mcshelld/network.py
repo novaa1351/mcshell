@@ -45,9 +45,9 @@ import logging
 import shutil
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from . import protocol as p
+from .paths import ASKPASS
 
 log = logging.getLogger(__name__)
 
@@ -88,8 +88,7 @@ BT_POLL = 20.0
 
 # The password prompt for a secured network. The same helper `sudo` uses, for
 # the same reason: CLAUDE.md's rail is that credentials are asked for in a real
-# compositor window and never inside the game client.
-ASKPASS = Path(__file__).resolve().parents[1] / "tools" / "mcshell-askpass"
+# compositor window and never inside the game client: paths.ASKPASS.
 
 
 # Signal strength, in words, because the number is never still. Measured over

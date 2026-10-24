@@ -22,6 +22,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from . import protocol as p
+from .paths import ASKPASS
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +43,8 @@ MAX_LINE_CHARS = 512
 # fast producer sends few large messages and a slow one sends a line at a time.
 CHUNK = 4096
 
-# Where sudo is told to ask for a password. Shipped beside the daemon rather
-# than installed, so this is a repo path; if it is missing, nothing is injected
-# and sudo fails the way it would anyway.
-ASKPASS = Path(__file__).resolve().parents[1] / "tools" / "mcshell-askpass"
+# Where sudo is told to ask for a password: paths.ASKPASS. If it is missing,
+# nothing is injected and sudo fails the way it would anyway.
 
 # A command runs in its own session with stdin on /dev/null, so sudo has no
 # terminal to prompt on and refuses outright. An askpass helper is sudo's own

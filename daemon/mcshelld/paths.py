@@ -18,3 +18,8 @@ def root() -> Path:
 
 
 SESSION = root() / "session"
+
+#: sudo's and the Wi-Fi page's password prompt, a real window. Under the root
+#: rather than beside this file, which is a different directory once the
+#: daemon is installed as a Python package.
+ASKPASS = root() / "daemon" / "tools" / "mcshell-askpass"
