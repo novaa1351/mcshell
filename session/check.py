@@ -35,6 +35,10 @@ from pathlib import Path
 
 ROOT = Path(os.environ.get("MCSHELL_ROOT") or Path(__file__).resolve().parents[1])
 SESSION = ROOT / "session"
+#: A git checkout builds the mod and runs the daemon from its venv; the Arch
+#: package installs neither (the jar comes with the release), so the advice
+#: for fixing something differs between the two.
+CHECKOUT = (ROOT / "mod" / "gradlew").exists()
 
 REQUIRED, FEATURE, OPTIONAL = "required", "feature", "optional"
 #: Required too, and counted as such; printed in their own section first,
@@ -72,6 +76,12 @@ def instance_dir() -> Path:
         return Path(os.environ["MCSHELL_INSTANCE"])
     return (Path.home() / ".local/share/PrismLauncher/instances"
             / (os.environ.get("MCSHELL_INSTANCE_NAME") or "MCShell"))
+
+
+def daemon_path() -> str:
+    """The mcshelld the units run: this checkout's venv, else the one on PATH."""
+    venv = ROOT / "daemon" / ".venv" / "bin" / "mcshelld"
+    return str(venv) if venv.exists() or CHECKOUT else (shutil.which("mcshelld") or "mcshelld")
 
 
 def daemon_python() -> str:
@@ -154,10 +164,11 @@ def dependencies() -> None:
     check(REQUIRED, not missing, "daemon's Python modules",
           f"{py} lacks {', '.join(missing)}; the daemon cannot start" if missing
           else f"i3ipc and pyxdg, under {py}")
-    daemon = ROOT / "daemon" / ".venv" / "bin" / "mcshelld"
-    check(REQUIRED, daemon.exists() or has("mcshelld"), "the daemon",
-          f"{daemon} — the shell itself" if daemon.exists() else
-          "no mcshelld: cd daemon && uv venv && uv pip install -e .")
+    daemon = daemon_path()
+    check(REQUIRED, os.access(daemon, os.X_OK), "the daemon",
+          f"{daemon} — the shell itself" if os.access(daemon, os.X_OK) else
+          "no mcshelld: cd daemon && uv venv && uv pip install -e ." if CHECKOUT
+          else "no mcshelld: reinstall the mcshell package")
     check(REQUIRED, has("prismlauncher"), "Prism Launcher",
           "starts the game; without it there is no backdrop and no shell")
     java = from_file(instance_dir() / "instance.cfg", r"^JavaPath=(.+)$") or \
@@ -291,27 +302,33 @@ def setup_state() -> None:
           "signed in" if "MSA" in kinds else
           "open Prism once and sign in; until then it asks at every login")
 
+    fix_session = ("run session/install-session.sh" if CHECKOUT
+                   else "reinstall the mcshell package")
     entry = Path("/usr/share/wayland-sessions/mcshell.desktop")
     exe = from_file(entry, r"^Exec=(.+)$")
     want = str(SESSION / "start-session.sh")
     check(SETUP, exe == want, "the login screen's session entry",
           f"{entry}" if exe == want else
           (f"{entry} runs {exe}, not this checkout" if exe else f"no {entry}")
-          + ("" if exe == want else ": run session/install-session.sh"))
-    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
-    stale = []
-    for name in ("mcshelld.service", "mcshell-client.service"):
-        rendered = (SESSION / "systemd" / f"{name}.in").read_text().replace("@REPO@", str(ROOT))
+          + ("" if exe == want else ": " + fix_session))
+    # The files systemd would actually load, wherever they are: this
+    # checkout's install-session.sh writes them under ~/.config, the Arch
+    # package under /usr/lib, and a user's copy wins over the package's.
+    stale, where = [], set()
+    for name in ("mcshelld.service", "mcshell-client.service", "mcshell-session.target"):
+        loaded = run("systemctl", "--user", "show", "-p", "FragmentPath", "--value", name).strip()
+        template = SESSION / "systemd" / (name if name.endswith(".target") else f"{name}.in")
+        rendered = template.read_text().replace("@REPO@", str(ROOT)).replace("@MCSHELLD@", daemon_path())
         try:
-            if (units / name).read_text() != rendered:
+            if not loaded or Path(loaded).read_text() != rendered:
                 stale.append(name)
+            else:
+                where.add(str(Path(loaded).parent))
         except OSError:
             stale.append(name)
-    if not (units / "mcshell-session.target").exists():
-        stale.append("mcshell-session.target")
     check(SETUP, not stale, "systemd user units",
-          f"current, in {units}" if not stale else
-          f"missing or out of date: {', '.join(stale)} — run session/install-session.sh")
+          f"current, in {', '.join(sorted(where))}" if not stale else
+          f"missing or out of date: {', '.join(stale)} — " + fix_session)
 
 
 def report() -> int:

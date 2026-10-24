@@ -57,8 +57,11 @@ check /usr/bin/prismlauncher "pacman -S prismlauncher"
 # directory, and a unit that only works in one place is a trap for the day it
 # moves.
 mkdir -p "$units"
+# @MCSHELLD@ is the daemon: this checkout's venv here, /usr/bin/mcshelld in
+# the Arch package, which renders the same templates.
 render() {
-	sed "s|@REPO@|$repo|g" "$repo/session/systemd/$1.in" >"$units/$1"
+	sed -e "s|@REPO@|$repo|g" -e "s|@MCSHELLD@|$repo/daemon/.venv/bin/mcshelld|g" \
+		"$repo/session/systemd/$1.in" >"$units/$1"
 	echo "  $units/$1"
 }
 echo "units:"

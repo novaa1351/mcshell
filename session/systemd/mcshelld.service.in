@@ -8,7 +8,7 @@ Type=simple
 # Where session/ is, for the two things the daemon runs out of it: the
 # overlay and the lock screen. The same name start-session.sh gives sway.
 Environment=MCSHELL_ROOT=@REPO@
-ExecStart=@REPO@/daemon/.venv/bin/mcshelld -v
+ExecStart=@MCSHELLD@ -v
 
 # CLAUDE.md's rail. The daemon is the only thing that knows how to launch,
 # focus or close a window, so a crash costs the shell its taskbar — and the
