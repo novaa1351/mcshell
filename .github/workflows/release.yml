@@ -4,9 +4,10 @@
 #   mcshell-X.Y.Z.mrpack    the Prism instance, as `mcshell setup` makes it
 #   mcshell-X.Y.Z.tar.gz    the source, as `git archive` has it at the tag
 #
-# The tag has to agree with mod_version in mod/gradle.properties, or nothing
-# is published: a release whose files call themselves another version is
-# worse than no release.
+# The tag has to agree with mod_version in mod/gradle.properties and with the
+# daemon's version in daemon/pyproject.toml, or nothing is published: a
+# release whose files call themselves another version is worse than no
+# release, and the Arch package installs the two together.
 #
 #   git tag -a v0.1.0 -m "MCShell 0.1.0" && git push origin v0.1.0
 
@@ -24,12 +25,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: The tag matches mod_version
+      - name: The tag matches the mod's and the daemon's versions
         id: version
         run: |
           version=$(sed -n 's/^mod_version=//p' mod/gradle.properties)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME, but mod/gradle.properties says $version" >&2
+          daemon=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' daemon/pyproject.toml)
+          if [ "v$version" != "$GITHUB_REF_NAME" ] || [ "$daemon" != "$version" ]; then
+            echo "tag $GITHUB_REF_NAME, mod $version, daemon $daemon: all three must agree" >&2
             exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"

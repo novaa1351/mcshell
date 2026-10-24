@@ -1,6 +1,6 @@
 [project]
 name = "mcshelld"
-version = "0.0.0"
+version = "0.1.0"  # = mod_version in mod/gradle.properties; release.yml checks
 description = "mcshell daemon — Minecraft as a Linux desktop shell"
 requires-python = ">=3.11"
 dependencies = [
