@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build the mod and install the jar into the Prism instance.
+# Build the mod and install the jar into the Prism instance. An installed
+# release has it built already, in release/, and installs that instead.
 #
 # CLAUDE.md asks for this step by name, because the alternative is a real
 # session that quietly keeps running whatever jar was copied in last and a
@@ -16,22 +17,24 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$repo/session/prism/common.sh"
 require_instance
 
-"$repo/mod/gradlew" -p "$repo/mod" --console=plain build || exit 1
-
-# The build directory also holds -sources and -dev jars. The remapped one is
-# the only one a real client can load.
-jar=""
-for f in "$repo/mod/build/libs"/mcshell-*.jar; do
-	case "$f" in
-	*-sources.jar | *-dev.jar | *-dev-shadow.jar) continue ;;
-	*'*'*) continue ;;
-	esac
-	jar="$f"
-done
-
+jar=$(release_file 'mcshell-*.jar') || jar=""
 if [ -z "$jar" ]; then
-	echo "gradle build produced no jar in $repo/mod/build/libs" >&2
-	exit 1
+	"$repo/mod/gradlew" -p "$repo/mod" --console=plain build || exit 1
+
+	# The build directory also holds -sources and -dev jars. The remapped one
+	# is the only one a real client can load.
+	for f in "$repo/mod/build/libs"/mcshell-*.jar; do
+		case "$f" in
+		*-sources.jar | *-dev.jar | *-dev-shadow.jar) continue ;;
+		*'*'*) continue ;;
+		esac
+		jar="$f"
+	done
+
+	if [ -z "$jar" ]; then
+		echo "gradle build produced no jar in $repo/mod/build/libs" >&2
+		exit 1
+	fi
 fi
 
 mkdir -p "$mc/mods"

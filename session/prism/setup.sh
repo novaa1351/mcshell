@@ -22,7 +22,7 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 # will ship one. From a checkout there is none, so build it: the mod's jar
 # first, because the pack carries it.
 if [ ! -f "$MCSHELL_INSTANCE/instance.cfg" ]; then
-	pack=${MCSHELL_PACK:-}
+	pack=${MCSHELL_PACK:-$(release_file 'mcshell-*.mrpack')}
 	if [ -z "$pack" ]; then
 		"$repo/mod/gradlew" -p "$repo/mod" --console=plain build || exit 1
 		pack=$(python3 "$repo/session/prism/mrpack.py") || exit 1

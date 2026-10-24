@@ -45,6 +45,22 @@ unset _default
 # shellcheck disable=SC2034  # read by the scripts that source this
 mc="$MCSHELL_INSTANCE/minecraft"
 
+# An installed release (the Arch package) carries the mod already built, in
+# release/: mcshell-<version>.jar and .mrpack, from the same GitHub release as
+# the rest of the tree. A checkout has no release/ and builds them. The
+# version stays in the names because install-mod.sh clears mcshell-*.jar.
+# $repo is set by every script that sources this, before it does.
+# shellcheck disable=SC2034,SC2154
+release="$repo/release"
+
+# The one file in release/ matching a pattern, or nothing.
+release_file() {
+	for f in "$release"/$1; do
+		[ -f "$f" ] && echo "$f" && return 0
+	done
+	return 1
+}
+
 require_instance() {
 	if [ ! -f "$MCSHELL_INSTANCE/instance.cfg" ]; then
 		echo "no Prism instance at $MCSHELL_INSTANCE" >&2
