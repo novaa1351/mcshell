@@ -1,0 +1,91 @@
+# Maintainer: novaa1351 <247712659+novaa1351@users.noreply.github.com>
+#
+# The AUR's copy of this file is published from here; see packaging/arch/README.md.
+# Built from a tagged release: the source, the mod's jar and the .mrpack all
+# come from the same GitHub release, so they always match. The mod is not
+# built here — Fabric Loom would download and remap Minecraft on every build.
+
+pkgname=mcshell
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A Linux desktop that uses Minecraft as its shell, on Sway"
+arch=('any')
+url="https://github.com/novaa1351/mcshell"
+license=('MIT')
+# What README.md calls required, less git and uv, which only a checkout needs.
+depends=(
+  'sway' 'swaybg' 'swaylock' 'hyprlock' 'polkit-gnome' 'foot'
+  'python' 'python-i3ipc' 'python-pyxdg' 'python-dbus-next' 'python-gobject'
+  'gtk4' 'gtk4-layer-shell'
+  'prismlauncher' 'jdk21-openjdk'
+  'curl' 'zstd' 'systemd'
+)
+# What README.md recommends, and what each one adds, in the words
+# `mcshell check` uses for it (session/check.py): keep the two in step.
+optdepends=(
+  'pipewire-pulse: the Sound page, and notification sounds (pactl, paplay)'
+  'wireplumber: volume keys and the volume bar (wpctl)'
+  'networkmanager: the Network page, and deciding to boot offline'
+  'bluez-utils: the Bluetooth group on the Network page'
+  'grim: F2 screenshots'
+  'wl-clipboard: F2 screenshots, to the clipboard'
+  'libnotify: the toast after a screenshot'
+  "brightnessctl: brightness keys and the Video page's brightness"
+  'playerctl: media play/pause/next keys'
+  "socat: the volume bar at 0% and 100%, and the boot screen's offline line"
+  "wlr-randr: the boot background's size before sway starts"
+  'librsvg: icons for apps that ship only an SVG'
+  "imagemagick: the lock screen's third fallback"
+  'pciutils: the GPU line on the Statistics screen'
+  'zenity: sudo and Wi-Fi password prompts, if no ssh-askpass is installed'
+  'xdg-desktop-portal-gtk: choosing the notification sound'
+)
+makedepends=('python-build' 'python-installer' 'python-hatchling')
+source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz"
+        "$url/releases/download/v$pkgver/$pkgname-$pkgver.jar"
+        "$url/releases/download/v$pkgver/$pkgname-$pkgver.mrpack")
+noextract=("$pkgname-$pkgver.jar" "$pkgname-$pkgver.mrpack")
+# Filled from the published release with `updpkgsums`; see README.md here.
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP')
+
+build() {
+  cd "$pkgname-$pkgver/daemon"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  local share=/usr/share/$pkgname
+
+  # The daemon, as a Python package: /usr/bin/mcshelld.
+  python -m installer --destdir="$pkgdir" daemon/dist/*.whl
+
+  # Everything else the shell runs, under one root. $MCSHELL_ROOT points
+  # there from the units, and the scripts find it from their own location.
+  install -d "$pkgdir$share"
+  cp -a bin session templates "$pkgdir$share/"
+  install -Dm755 daemon/tools/mcshell-askpass daemon/tools/mcsh -t "$pkgdir$share/daemon/tools/"
+
+  # The mod, prebuilt: `mcshell setup` installs these when there is no mod/.
+  install -Dm644 "$srcdir/$pkgname-$pkgver.jar" "$srcdir/$pkgname-$pkgver.mrpack" \
+    -t "$pkgdir$share/release/"
+
+  install -d "$pkgdir/usr/bin"
+  ln -s "$share/bin/mcshell" "$pkgdir/usr/bin/mcshell"
+
+  # The same templates install-session.sh renders for a checkout.
+  local unit
+  for unit in mcshelld.service mcshell-client.service; do
+    sed -e "s|@REPO@|$share|g" -e "s|@MCSHELLD@|/usr/bin/mcshelld|g" \
+      "session/systemd/$unit.in" > "$srcdir/$unit"
+    install -Dm644 "$srcdir/$unit" -t "$pkgdir/usr/lib/systemd/user/"
+  done
+  install -Dm644 session/systemd/mcshell-session.target -t "$pkgdir/usr/lib/systemd/user/"
+  sed "s|@REPO@|$share|g" session/mcshell.desktop.in > "$srcdir/mcshell.desktop"
+  install -Dm644 "$srcdir/mcshell.desktop" -t "$pkgdir/usr/share/wayland-sessions/"
+
+  install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+  install -Dm644 README.md docs/troubleshooting.md -t "$pkgdir/usr/share/doc/$pkgname/"
+}
