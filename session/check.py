@@ -190,10 +190,10 @@ def dependencies() -> None:
     gi = subprocess.run(["/usr/bin/python3", "-c",
                          "import gi; gi.require_version('Gtk', '4.0'); "
                          "gi.require_version('Gtk4LayerShell', '1.0'); "
-                         "from gi.repository import Gtk, Gtk4LayerShell"],
+                         "from gi.repository import Gtk, Gtk4LayerShell; import cairo"],
                         capture_output=True, text=True)
     check(FEATURE, bool(preload) and Path(preload).exists() and gi.returncode == 0,
-          "the overlay (GTK 4, gtk4-layer-shell)",
+          "the overlay (GTK 4, gtk4-layer-shell, pycairo)",
           "boot screen, notifications, volume bar" if gi.returncode == 0 and Path(preload).exists()
           else "no boot screen, no notifications, no volume bar — "
                + (f"{preload} missing" if not Path(preload).exists() else

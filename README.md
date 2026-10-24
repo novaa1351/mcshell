@@ -36,7 +36,7 @@ desktop is still there if you want to go back.
 Required:
 
 ```bash
-sudo pacman -S --needed git sway swaybg swaylock hyprlock polkit-gnome foot python python-gobject gtk4 gtk4-layer-shell uv curl zstd prismlauncher jdk21-openjdk
+sudo pacman -S --needed git sway swaybg swaylock hyprlock polkit-gnome foot python python-gobject python-cairo gtk4 gtk4-layer-shell uv curl zstd prismlauncher jdk21-openjdk
 ```
 
 Recommended (sound, network, screenshots, media keys and so on):
