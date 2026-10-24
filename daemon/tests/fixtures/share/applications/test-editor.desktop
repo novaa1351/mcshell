@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Test Editor
+Comment=Edits test files
+Exec=true %F
+Categories=Utility;TextEditor;

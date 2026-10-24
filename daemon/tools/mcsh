@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+"""mcsh — send one JSON line to mcshelld and print what comes back.
+
+    mcsh '{"t":"windows_query"}'
+    mcsh windows            # shorthand for the above
+    mcsh ping
+    mcsh sh git status      # run a command bar line, following its output
+    mcsh settings           # every settings page
+    mcsh audio              # just the Sound page
+    mcsh set audio.sink..volume 0.4
+    echo '{"t":"ping"}' | mcsh
+
+Exists so the daemon can be driven and verified with no Minecraft involved.
+Real stack traces beat Minecraft crash logs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import socket
+import sys
+from pathlib import Path
+
+# Shorthands for messages typed often enough that quoting JSON is a nuisance.
+SHORTHAND = {
+    "ping": {"t": "ping"},
+    "windows": {"t": "windows_query"},
+    "taskbar": {"t": "taskbar_query"},
+    "apps": {"t": "catalog_query", "text": ""},
+    "hello": {"t": "hello", "proto": 1, "mc": "1.21.1"},
+    "overview": {"t": "overview_set", "show": True},
+    "overview-off": {"t": "overview_set", "show": False},
+    "settings": {"t": "settings_query", "page": None},
+    "audio": {"t": "settings_query", "page": "audio"},
+    "video": {"t": "settings_query", "page": "video"},
+    "controls": {"t": "settings_query", "page": "controls"},
+    "network": {"t": "settings_query", "page": "network"},
+    "general": {"t": "settings_query", "page": "general"},
+    "stats": {"t": "stats_query", "tab": "general"},
+    "disks": {"t": "stats_query", "tab": "disks"},
+}
+
+
+def socket_path() -> Path:
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    return Path(runtime) / "mcshell.sock"
+
+
+def render(obj: dict, raw: bool) -> str:
+    if raw:
+        return json.dumps(obj, separators=(",", ":"))
+
+    # A window list is the thing we stare at most in M0, so give it a table
+    # instead of a wall of JSON.
+    if obj.get("t") == "windows":
+        wins = obj.get("windows", [])
+        if not wins:
+            return "(no windows)"
+        rows = [("", "APP_ID", "WS", "TITLE", "CON")]
+        for w in wins:
+            rows.append(
+                (
+                    "*" if w.get("focused") else " ",
+                    str(w.get("app_id", "?")),
+                    str(w.get("workspace") or "-"),
+                    str(w.get("title", ""))[:48],
+                    str(w.get("con_id", "")),
+                )
+            )
+        return _table(rows)
+
+    if obj.get("t") == "taskbar":
+        rows = [("SLOT", "APP", "STATE", "WINS", "ICON")]
+        for s in obj.get("slots", []):
+            if not s.get("app"):
+                rows.append((str(s["i"]), "-", "", "", ""))
+                continue
+            state = "launching" if s.get("launching") else (
+                "running" if s.get("running") else "stopped")
+            if s.get("focused"):
+                state += " *focused*"
+            icon = s.get("icon_path") or ""
+            rows.append((str(s["i"]), s["app"], state,
+                         str(s.get("windows", 0)),
+                         "/" + icon.rsplit("/", 1)[-1] if icon else "(none)"))
+        return _table(rows)
+
+    if obj.get("t") == "command_start":
+        return f"$ {obj.get('text', '')}"
+
+    if obj.get("t") == "output":
+        prefix = "! " if obj.get("stream") == "stderr" else ""
+        return "\n".join(prefix + line for line in obj.get("lines", []))
+
+    if obj.get("t") == "command_end":
+        code, note = obj.get("code", 0), obj.get("note", "")
+        if code == 0 and not note:
+            return ""
+        parts = [f"exit {code}"] if code else []
+        if note:
+            parts.append(note)
+        return "[" + ", ".join(parts) + "]"
+
+    if obj.get("t") == "settings_schema":
+        items = obj.get("items", [])
+        if not items:
+            page = obj.get("page") or "any"
+            return f"(no settings on page {page})"
+        rows = [("PAGE", "GROUP", "KEY", "TYPE", "LABEL", "VALUE")]
+        for it in items:
+            rows.append((
+                it.get("page", ""), it.get("group", ""), it.get("key", ""),
+                it.get("type", ""), it.get("label", "")[:28],
+                _value(it),
+            ))
+        return _table(rows) + f"\n{len(items)} setting(s)"
+
+    if obj.get("t") == "catalog":
+        items = obj.get("items", [])
+        if not items:
+            return "(no matches)"
+        rows = [("ID", "NAME", "TAB", "ICON")]
+        for it in items:
+            rows.append((it.get("id", ""), it.get("name", "")[:28],
+                         it.get("tab", ""), "yes" if it.get("icon_path") else "no"))
+        return _table(rows) + f"\n{len(items)} app(s)"
+
+    return json.dumps(obj, indent=2)
+
+
+def _value(item) -> str:
+    """One settings row's value, as a person would want to read it.
+
+    An enum's value is an opaque id — a PipeWire sink name runs to seventy
+    characters — so show the label it stands for and keep the id for `-r`.
+    """
+    value = item.get("value")
+    if item.get("type") == "enum":
+        for option in item.get("options", []):
+            if option.get("id") == value:
+                return str(option.get("label", value))
+        return "(none)" if value is None else f"?{value}"
+    if item.get("type") == "bool":
+        return "yes" if value else "no"
+    if item.get("unit") == "%" and isinstance(value, (int, float)):
+        return f"{round(value * 100)}%"
+    return "" if value is None else str(value)
+
+
+def _table(rows):
+    widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    return "\n".join(
+        "  ".join(c.ljust(widths[i]) for i, c in enumerate(row)).rstrip()
+        for row in rows
+    )
+
+
+# Options that take a value, so a bare `sh` right after one of them is that
+# value and not the shorthand.
+_VALUE_FLAGS = ("-s", "--socket", "-t", "--timeout")
+
+
+def split_verb(argv: list[str], verb: str) -> tuple[list[str], list[str] | None]:
+    """Split argv at a bare `verb`, returning what came before and after.
+
+    Everything after it is taken verbatim and never parsed: argparse would
+    otherwise claim `git rev-parse --abbrev-ref HEAD`'s flags as its own.
+    """
+    for i, token in enumerate(argv):
+        if token == verb and (i == 0 or argv[i - 1] not in _VALUE_FLAGS):
+            return argv[:i], argv[i + 1:]
+    return argv, None
+
+
+def split_sh(argv: list[str]) -> tuple[list[str], str | None]:
+    """Pull a trailing `sh <command line>` off the arguments.
+
+    Everything after `sh` is the command, taken verbatim and never parsed:
+    argparse would otherwise claim `git rev-parse --abbrev-ref HEAD`'s flags as
+    its own. Tokens are rejoined with single spaces, so an argument that itself
+    contains spaces has to be quoted within one shell word:
+
+        mcsh sh grep "foo bar" file      # grep foo bar file  — wrong
+        mcsh sh 'grep "foo bar" file'    # right
+    """
+    argv, rest = split_verb(argv, "sh")
+    return argv, None if rest is None else " ".join(rest)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    argv, command = split_sh(argv)
+    argv, setting = split_verb(argv, "set")
+
+    ap = argparse.ArgumentParser(
+        prog="mcsh",
+        description="Send one newline-delimited JSON message to mcshelld.",
+        epilog=(
+            "shorthands: sh <command line>, set <key> <value>, "
+            + ", ".join(sorted(SHORTHAND))
+        ),
+    )
+    ap.add_argument("message", nargs="?", help="JSON object, or a shorthand name. Omit to read stdin.")
+    ap.add_argument("-s", "--socket", type=Path, default=None, help="socket path override")
+    ap.add_argument("-r", "--raw", action="store_true", help="print the raw JSON reply")
+    ap.add_argument(
+        "-n", "--no-reply", action="store_true", help="send and exit without waiting"
+    )
+    ap.add_argument(
+        "-t", "--timeout", type=float, default=5.0, help="seconds to wait for a reply"
+    )
+    args = ap.parse_args(argv)
+
+    if setting is not None:
+        if len(setting) != 2:
+            ap.error("set: needs exactly a key and a value")
+        key, raw_value = setting
+        # JSON first, so 0.4 is a number and true is a boolean; anything else
+        # is a string, which is what device names and profiles are.
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            value = raw_value
+        payload = json.dumps({"t": "setting_set", "key": key, "value": value},
+                             separators=(",", ":"))
+        return exchange(args, payload)
+
+    if command is not None:
+        if not command:
+            command = sys.stdin.read().strip()
+        if not command:
+            ap.error("sh: no command given")
+        payload = json.dumps({"t": "command_submit", "text": command}, separators=(",", ":"))
+        return exchange(args, payload)
+
+    text = args.message if args.message is not None else sys.stdin.read().strip()
+    if not text:
+        ap.error("no message given")
+
+    if text in SHORTHAND:
+        payload = json.dumps(SHORTHAND[text], separators=(",", ":"))
+    else:
+        try:
+            json.loads(text)
+        except json.JSONDecodeError as e:
+            print(f"mcsh: not valid JSON and not a known shorthand: {e}", file=sys.stderr)
+            return 2
+        payload = text
+
+    return exchange(args, payload)
+
+
+# A command bar line may run for as long as the daemon lets it, so following one
+# cannot use the short default reply timeout.
+FOLLOW_TIMEOUT = 70.0
+
+
+def exchange(args, payload: str) -> int:
+    """Send one message, print what comes back, and return an exit status.
+
+    Most messages are answered by exactly one line. A `command_submit` is
+    answered by a stream — `command_start`, then output as the command produces
+    it, then `command_end` — so keep reading until that end arrives, printing as
+    it goes. Anything else would show a build's output only once it was over.
+    """
+    path = args.socket or socket_path()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(args.timeout)
+    try:
+        sock.connect(str(path))
+    except FileNotFoundError:
+        print(f"mcsh: no socket at {path} — is mcshelld running?", file=sys.stderr)
+        return 1
+    except ConnectionRefusedError:
+        print(f"mcsh: {path} exists but nothing is listening (stale socket)", file=sys.stderr)
+        return 1
+
+    following = None  # the cmd id we are waiting to see end
+
+    with sock:
+        sock.sendall(payload.encode() + b"\n")
+        if args.no_reply:
+            return 0
+
+        buf = b""
+        while True:
+            try:
+                while b"\n" not in buf:
+                    chunk = sock.recv(65536)
+                    if not chunk:
+                        if following is not None:
+                            print("mcsh: daemon closed mid-command", file=sys.stderr)
+                            return 1
+                        print("mcsh: daemon closed the connection without replying",
+                              file=sys.stderr)
+                        return 1
+                    buf += chunk
+            except socket.timeout:
+                waited = FOLLOW_TIMEOUT if following is not None else args.timeout
+                print(f"mcsh: no reply within {waited:g}s", file=sys.stderr)
+                return 1
+
+            line, buf = buf.split(b"\n", 1)
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(line.decode("utf-8", errors="replace"))
+                return 1
+
+            kind = obj.get("t")
+            # While following a command, ignore the unrelated pushes (a taskbar
+            # after a `&` launch, an overview) that would interleave a table
+            # into the middle of its output.
+            if following is None or kind in ("output", "command_end", "error"):
+                rendered = render(obj, args.raw)
+                if rendered:
+                    print(rendered, flush=True)
+            if kind == "error":
+                return 1
+            if kind == "command_start" and following is None:
+                # The daemon runs one command at a time, so the first start we
+                # see after submitting is ours.
+                following = obj.get("cmd")
+                sock.settimeout(FOLLOW_TIMEOUT)
+                continue
+            if following is not None:
+                if kind == "command_end" and obj.get("cmd") == following:
+                    code = obj.get("code", 0)
+                    return code if 0 <= code <= 255 else 1
+                continue
+            return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except BrokenPipeError:
+        # `mcsh sh seq 3000 | head` closes our stdout mid-stream. That is a
+        # normal way to use a pipe, not a traceback.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(141)

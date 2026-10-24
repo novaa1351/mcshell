@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Test Hidden
+Exec=true
+NoDisplay=true
+Categories=Utility;

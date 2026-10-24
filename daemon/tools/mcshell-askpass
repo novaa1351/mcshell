@@ -1,0 +1,51 @@
+#!/bin/sh
+# mcshell-askpass — ask for a password in a real window, print it on stdout.
+#
+# sudo runs this when it has no terminal to prompt on, which in the command bar
+# is always: a command runs in its own session with stdin on /dev/null, so there
+# is no tty to read a password from. The daemon points SUDO_ASKPASS here and
+# calls sudo with `-A`.
+#
+# The prompt is a compositor window, not something drawn inside Minecraft. That
+# is the point. CLAUDE.md keeps credentials out of the game client, and a
+# password typed into chat would be drawn on screen and kept in the transcript.
+#
+# To use a different prompter, edit the list below: it is tried in order and the
+# first one installed wins. Print nothing and exit non-zero to cancel, which
+# sudo reports as an authentication failure.
+
+prompt="${1:-Password:}"
+
+# Purpose-built askpass helpers first. All take the prompt as $1 and write the
+# password to stdout, which is exactly the contract sudo expects.
+for helper in \
+	/usr/lib/seahorse/ssh-askpass \
+	/usr/lib/ssh/ssh-askpass \
+	lxqt-openssh-askpass \
+	ksshaskpass \
+	x11-ssh-askpass
+do
+	if command -v "$helper" >/dev/null 2>&1; then
+		exec "$helper" "$prompt"
+	fi
+done
+
+if command -v zenity >/dev/null 2>&1; then
+	exec zenity --password --title="mcshell"
+fi
+
+# dmenu-alikes with a password mode: typing is masked and the line goes to
+# stdout. stdin is closed so they show an empty list and act as a text field.
+if command -v fuzzel >/dev/null 2>&1; then
+	exec fuzzel --dmenu --password --prompt="$prompt " </dev/null
+fi
+if command -v wofi >/dev/null 2>&1; then
+	exec wofi --dmenu --password --prompt "$prompt" </dev/null
+fi
+if command -v rofi >/dev/null 2>&1; then
+	exec rofi -dmenu -password -lines 0 -p "$prompt" </dev/null
+fi
+
+echo "mcshell-askpass: no password prompter installed" >&2
+echo "  tried: ssh-askpass, zenity, fuzzel, wofi, rofi" >&2
+exit 1

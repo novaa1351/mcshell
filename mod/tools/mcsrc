@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""mcsrc — print a decompiled vanilla class from Loom's decompile cache.
+
+    mod/tools/mcsrc DrawContext
+    mod/tools/mcsrc DrawContext drawTexture     # only matching lines, with context
+    mod/tools/mcsrc net/minecraft/client/gui/DrawContext
+
+Populate the cache once with `./gradlew genSources`, then read Minecraft's
+source instead of guessing at it. Guessing cost real time in M2: two vanilla
+texture dimensions were wrong, and both were one grep away.
+
+The cache is a zip of opaque hash names; each entry is a short binary header
+carrying the class name, followed by plain Java.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+import zipfile
+from pathlib import Path
+
+CACHE = Path.home() / ".gradle/caches/fabric-loom/decompile/v1.zip"
+
+
+def entries(zf: zipfile.ZipFile):
+    """Yield (class name, source) for every cached class."""
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        blob = zf.read(info)
+        # ... NAME <4-byte length> <class name> SRC <4-byte length> <source>
+        m = re.search(rb"NAME.{4}([\w/$]+?)SRC", blob, re.S)
+        if not m:
+            continue
+        start = blob.find(b"package ")
+        if start < 0:
+            continue
+        # The entry does not end at the source: a line-mapping table follows it.
+        # Cut at the first NUL, which is the first byte of that table and cannot
+        # appear in Java source. Left in, it makes the output a "binary file" as
+        # far as grep is concerned, and grep then prints nothing at all —
+        # silently, which is the worst way for a tool built to be grepped to
+        # fail.
+        body = blob[start:].split(b"\x00", 1)[0]
+        yield m.group(1).decode(), body.decode("utf-8", "replace")
+
+
+def main(argv: list[str]) -> int:
+    if not argv:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    wanted, pattern = argv[0], (argv[1] if len(argv) > 1 else None)
+
+    if not CACHE.exists():
+        print(f"mcsrc: no decompile cache at {CACHE}", file=sys.stderr)
+        print("run: cd mod && ./gradlew genSources", file=sys.stderr)
+        return 1
+
+    # Match the tail of the class path, so a bare class name is enough.
+    want = wanted.replace(".", "/")
+    hits = []
+    with zipfile.ZipFile(CACHE) as zf:
+        for name, source in entries(zf):
+            if name == want or name.endswith("/" + want):
+                hits.append((name, source))
+
+    if not hits:
+        print(f"mcsrc: no class matching {wanted!r}", file=sys.stderr)
+        return 1
+    if len(hits) > 1:
+        print("mcsrc: ambiguous, pick one:", file=sys.stderr)
+        for name, _ in hits:
+            print("  " + name, file=sys.stderr)
+        return 1
+
+    name, source = hits[0]
+    if pattern is None:
+        print(source)
+        return 0
+
+    # With a pattern, print matching lines plus a little context — enough to
+    # read a signature and its javadoc.
+    lines = source.splitlines()
+    rx = re.compile(pattern)
+    shown: set[int] = set()
+    for i, line in enumerate(lines):
+        if rx.search(line):
+            shown.update(range(max(0, i - 4), min(len(lines), i + 5)))
+    if not shown:
+        print(f"mcsrc: {name} has no line matching {pattern!r}", file=sys.stderr)
+        return 1
+    last = -2
+    for i in sorted(shown):
+        if i != last + 1:
+            print(f"--- {name}:{i + 1}")
+        print(f"{i + 1:5d}  {lines[i]}")
+        last = i
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,8 @@
+[Unit]
+Description=MCShell session
+
+# The handle the compositor pulls, and the one thing that stops everything
+# again. sway starts this target and start-session.sh stops it after sway
+# exits, so a logout does not leave a daemon and a Minecraft behind holding
+# the world's session.lock against the next login.
+Wants=mcshelld.service mcshell-client.service

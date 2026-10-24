@@ -1,0 +1,421 @@
+# Testing MCShell — M9 onward
+
+`docs/testing.md` is the prototype (M0–M7) and `docs/testing2.md` is the
+polish (M8); both passed and both are closed. **This file starts at M9**, the
+production milestone — the plan is `docs/m9.md`.
+
+M9 adds no behaviour, so every walkthrough here has the same expected result:
+**exactly what it did before**, from a checkout that knows less about the
+machine it is on.
+
+The nested session is now started with `session/start-nested.sh`, not
+`sway -c session/sway.dev.conf` — see the first section.
+
+## Neither sway config names the checkout
+
+`session/sway.conf` and `session/sway.dev.conf` used to start with
+`set $repo` and this machine's checkout path. Now `start-session.sh` exports where it
+lives as `$MCSHELL_ROOT` before it runs sway, the configs say
+`set $repo $MCSHELL_ROOT`, and sway passes the name through untouched for
+`sh` to expand when a binding runs. The nested session gets the same variable
+from `session/start-nested.sh`, which is now how it is started.
+
+Measured headless (sway 1.12), from a copy of `session/` at another path:
+both configs load, every binding is stored as `exec $MCSHELL_ROOT/session/…`,
+an `exec` sent over IPC — the route the Controls page uses — expanded to the
+copy, and the Controls page labels the binds exactly as before. **Not
+measured:** a key press actually firing one. A headless sway has no keyboard,
+so that is step 3, and it is the part that matters.
+
+**Before you log out: do not press `$mod+Shift+c`** in the session you are
+in now. That sway was started without the variable, so a reload would read the
+new config and leave Super, F2, the volume keys, the lock and Alt+F4 all
+pointing at `/session/…`. Nothing else is affected; logging out and back in
+fixes it.
+
+1. Log out, and back in to MCShell. Nothing needs reinstalling — GDM runs the
+   same `start-session.sh`.
+2. Confirm the variable reached sway, by asking sway to run something — the
+   same route a key binding takes:
+
+   ```bash
+   swaymsg exec 'echo "$MCSHELL_ROOT" > $XDG_RUNTIME_DIR/root.check'
+   sleep 0.3      # exec returns before the command has run
+   cat $XDG_RUNTIME_DIR/root.check; rm $XDG_RUNTIME_DIR/root.check
+   # expect: the checkout's path, e.g. ~/mcshell spelled out
+   ```
+
+   An empty line means every step below fails, and that is the diagnosis.
+   Not `/proc/<sway>/environ`: Arch ships sway with `cap_sys_nice`, which makes
+   the process non-dumpable, so the kernel hands that file to root —
+   *permission denied* says nothing about the session. Any child of sway
+   (`swaybg`, a terminal) carries the same environment and can be read.
+
+3. Press every key that runs a session script. **Expect** each to do what it
+   always did:
+
+   | Key | Expect |
+   |---|---|
+   | `Super` (from an application) | Minecraft comes back to the front |
+   | `$mod+f` on a dragged-smaller window | it fills the screen again |
+   | `Alt+F4` on a terminal | the terminal closes |
+   | `Alt+F4` on Minecraft | nothing — it refuses on the backdrop |
+   | `F2` | a screenshot toast with a thumbnail |
+   | volume up / down / mute | the boss bar |
+   | `$mod+Shift+l` | the lock screen; unlock it |
+
+4. **Control:** `$mod+Shift+c` now, in the new session. **Expect:** the keys
+   in step 3 still work — this is the reload that would have broken them in
+   the old session.
+5. Open the Controls page. **Expect** the same labels as before —
+   `raise-mc.sh`, `volume.sh up` — not `$MCSHELL_ROOT/session/…`.
+6. Rebind one: move `screenshot.sh` from `F2` to another key, then
+
+   ```bash
+   cat ~/.config/sway/config.d/mcshell-binds.conf
+   # expect: bindsym <new key> exec $MCSHELL_ROOT/session/screenshot.sh
+   ```
+
+   Press the new key — **expect** the screenshot toast — then press *Reset*.
+   This is the line that used to carry a path to this machine; it now carries
+   none, so a rebind survives the checkout moving.
+7. Optional, nested: `session/start-nested.sh` from any directory, not only
+   from the checkout. **Expect** the daemon up inside it
+   (`$hatch+w` lists windows). As it always has, the nested session takes
+   the daemon's socket from the real one; `$mod+Shift+d` afterwards gives it
+   back.
+
+## The daemon finds `session/` through the same variable
+
+The daemon runs two things out of `session/`: the overlay (toasts, the volume
+bar, the boot screen) and the lock screen. It used to find them as a sibling of
+its own source, which only holds while the daemon lives inside the checkout.
+Now `mcshelld/paths.py` reads `$MCSHELL_ROOT`, the unit sets it, and with the
+variable unset the answer is the old one.
+
+Measured, without the game: unset, both resolve to this checkout; set to a
+copy elsewhere, both resolve to the copy.
+
+The unit has already been re-rendered (`install-session.sh --user-only`), but
+the daemon running now predates it.
+
+1. `$mod+Shift+d` to restart the daemon.
+2. Confirm it got the variable:
+
+   ```bash
+   tr '\0' '\n' </proc/$(systemctl --user show mcshelld -p MainPID --value)/environ | grep MCSHELL_ROOT
+   # expect: MCSHELL_ROOT= and the same path
+   ```
+
+   (The daemon is an ordinary process, so its `environ` is readable — unlike
+   sway's.)
+3. `notify-send -a Firefox "M9" "overlay"`. **Expect** the advancement toast.
+4. A volume key. **Expect** the boss bar.
+5. *Save and Quit to Title* → *Lock Screen*. **Expect** the Minecraft lock
+   screen, not bare swaylock; unlock it. Bare swaylock would mean the daemon
+   could not find `lock.sh` and fell back.
+
+## The terminal is `$TERMINAL`, else foot
+
+foot was written into sway.conf, the safety rail, the daemon's launcher for
+`Terminal=true` apps and the installer's requirements. Now it is one variable,
+and foot is what you get without it.
+
+- **Where to set it:** `~/.config/environment.d/50-terminal.conf`, holding
+  `TERMINAL=kitty` (or any program on `PATH`). Not a shell profile: GDM starts
+  the session with no login shell in between (measured), so a profile's export
+  may never arrive. `start-session.sh` asks systemd's user manager, which reads
+  `environment.d` itself.
+- **The rail** is `${TERMINAL:-foot}`: if the variable never arrives it still
+  opens foot.
+
+Measured without logging in: sway keeps `$TERMINAL` and its own `$term` apart;
+`start-session.sh`'s new lines yield a terminal in all five cases tried
+(variable set, in `environment.d`, absent, `systemctl` failing, no `systemctl`
+at all); the installer refuses only when neither `$TERMINAL` nor foot is on
+`PATH`; the Controls page labels the binds `foot`, or whatever the variable
+names. **Not measured:** any of it at a real login.
+
+**As before: do not press `$mod+Shift+c` until you have logged in again.** The
+running sway predates this and has no `TERMINAL`, so after a reload
+`$mod+Return` and `$mod+Shift+j` would open nothing. The rail would still open
+foot, which is the point of naming the fallback in place.
+
+1. Log out and back in, with nothing set. Then:
+
+   ```bash
+   swaymsg exec 'echo "[$TERMINAL]" > $XDG_RUNTIME_DIR/t.check'
+   sleep 0.3; cat $XDG_RUNTIME_DIR/t.check; rm $XDG_RUNTIME_DIR/t.check
+   # expect: [foot]
+   ```
+
+2. `$mod+Return`, `$mod+Shift+Return` and `$mod+Shift+j` each open foot (the
+   last one tailing the journal).
+3. Controls page: those binds are labelled `foot` and `foot -e journalctl…`,
+   not `$TERMINAL`.
+4. From the catalog, launch something that runs in a terminal — `htop`, or
+   Vim's `.desktop` entry if it is installed. **Expect** it in foot, and its
+   hotbar slot glinting (the window is still named after the app).
+5. **The setting itself.** Pick a terminal you have that is not foot (`kitty`):
+
+   ```bash
+   mkdir -p ~/.config/environment.d
+   echo 'TERMINAL=kitty' > ~/.config/environment.d/50-terminal.conf
+   ```
+
+   Log out and back in. Repeat 1–4. **Expect** `[kitty]`, kitty in every one,
+   and the labels saying `kitty`.
+6. Delete the file (or set it to what you actually want) and log in once more.
+
+**The rail checks for itself (fixed 2026-10-16).** It used to be
+`${TERMINAL:-foot}`, which falls back only when the variable is *empty*: a
+`TERMINAL=nope` ran `nope` and opened nothing. It is now
+`sh -c 'command -v "${TERMINAL%% *}" >/dev/null && exec $TERMINAL || exec foot'`.
+Measured through a headless sway's own parser, with stand-in terminals:
+`kitty` opens kitty; `nope`, empty and unset all open foot. The Controls page
+calls it `foot` (or `kitty or foot`).
+
+7. After the next login, any time: `$mod+Shift+Return` opens a terminal. To
+   see the fallback for real, put `TERMINAL=nope` in
+   `~/.config/environment.d/50-terminal.conf`, log in, and press it —
+   **expect** foot, while `$mod+Return` opens nothing. Then remove the file
+   and log in again.
+
+## The template worlds ship, with no player in them
+
+`templates/` holds Island, Skyblock and Tutorial World, made from the
+2026-09-13 snapshots by `templates/build.py`. The snapshots are untouched. What
+was taken out: both of your UUIDs' `playerdata`, `advancements` and `stats`,
+`level.dat_old`, and the `Player` compound in `level.dat` (your position, and
+a hotbar of seven application stacks and 40 acacia planks). `LevelName` is now
+each folder's name; all three said `MCShell`. `setup.sh` copies them into
+`saves/` through `seed-worlds.sh`, never over a world already there, and
+Tutorial World is the default when no world has been chosen.
+
+Measured, without the game: the build is reproducible; neither UUID appears in
+any shipped file or any of ~2600 decompressed chunks per world, and the same
+search finds them in the snapshots; seeding into a scratch instance copies
+three, then none, leaves a lived-in world alone, and refuses a tampered
+template. **Not tested: Minecraft loading an edited `level.dat`.** The edit
+round-trips byte for byte before it is made, but only the game can say it
+reads the result. That is step 2 below, and it is the important one.
+
+Your own worlds are not touched by any of this: all three names already exist
+in your `saves/`, so `seed-worlds.sh` skips them.
+
+1. Confirm that, before anything else:
+
+   ```bash
+   session/prism/seed-worlds.sh
+   # expect three lines ending "already in saves/, left as it is"
+   ```
+
+2. **Load a shipped template in the game.** Unpack Tutorial World under a name
+   of its own, so nothing of yours is in the way:
+
+   ```bash
+   saves=~/.local/share/PrismLauncher/instances/MCShell/minecraft/saves
+   mkdir /tmp/tw && tar -C /tmp/tw --zstd -xf "templates/Tutorial World.tar.zst"
+   mv "/tmp/tw/Tutorial World" "$saves/Tutorial World (fresh)" && rmdir /tmp/tw
+   ```
+
+   Pause menu → *Worlds...* → *Tutorial World (fresh)* → *Restart into …*.
+   **Expect:**
+   - it loads, with no error screen;
+   - you stand at the world's spawn rather than where you last were;
+   - the inventory's 27 slots and the ender chest are empty, and there are no
+     acacia planks;
+   - the hotbar still shows your applications (they come from the daemon,
+     not the world);
+   - F3 or the vanilla world list shows the name *Tutorial World*.
+3. Go back: *Worlds...* → your own *Tutorial World* → *Restart into …*, and
+   check your inventory is as you left it. Then delete the copy:
+   `rm -rf "$saves/Tutorial World (fresh)"`.
+4. **The default, for a machine with no choice yet.** Not worth a login on
+   yours; measured instead, in both readers: with no
+   `~/.config/mcshell/world`, the launcher's `common.sh` and the daemon's
+   `worlds.py` both answer `Tutorial World`, and a choice naming a missing
+   world falls back to it with a warning.
+
+## The instance is made from a .mrpack, with no clicks
+
+`session/prism/mrpack.py` builds `dist/mcshell-0.1.0.mrpack`: Minecraft
+1.21.1, Fabric Loader 0.19.5, the five pinned mods by URL and hash, and our
+jar. `setup.sh` now creates a missing instance from it through
+`session/prism/install-pack.py`.
+
+Not through `prismlauncher --import`, which was measured first: it opens the
+*New Instance* dialog and waits for OK, and names the instance after the file
+(`mcshell-0.1.0`). That is a second manual step beside signing in.
+
+Measured without the game, in a sandboxed Prism 11.0.3 on a headless sway:
+- the pack's files match Modrinth's API;
+- Prism's own importer accepts the pack;
+- `install-pack.py` writes the same `mmc-pack.json` as that importer and as
+  your instance, byte for byte;
+- Prism lists the result as *MCShell*, with all four components resolved and
+  all six mods enabled;
+- `setup.sh` builds a whole instance in 12.5s, and a second run creates
+  nothing.
+
+**Not tested: launching the game from an instance made this way.** The
+sandbox has no signed-in account, and that is what these steps are for.
+
+Do this **in Hyprland**, not the MCShell session. A second copy of the mod
+would connect to the running daemon, and the daemon expects one game.
+
+1. Build a second instance beside yours, from nothing:
+
+   ```bash
+   MCSHELL_INSTANCE_NAME=MCShell-fresh session/prism/setup.sh
+   # expect "instance: …/MCShell-fresh created from mcshell-0.1.0.mrpack",
+   # three "copied from the template" lines, then "instance ready"
+   ```
+
+   Your own `MCShell` instance is not touched. Everything this script reads
+   and writes is under `MCShell-fresh`.
+2. Open Prism. **Expect** *MCShell-fresh* in the list. *Edit* → *Version*
+   shows Minecraft 1.21.1 and Fabric Loader 0.19.5; *Mods* shows six.
+3. *Launch* it. **Expect** the title screen. The mod finds no daemon here and
+   only retries quietly, so the hotbar is empty, which is correct.
+4. *Singleplayer* → *Tutorial World*. **Expect:**
+   - it loads, with no error screen;
+   - you are at the world's spawn, with an empty inventory and ender chest;
+   - the world list names it *Tutorial World*.
+
+   This is also the in-game check of the shipped templates that the previous
+   section asked for.
+5. Quit the game and close Prism, then remove the copy:
+
+   ```bash
+   rm -rf ~/.local/share/PrismLauncher/instances/MCShell-fresh
+   ```
+
+## `mcshell check`
+
+`session/check.py`, run as `bin/mcshell check`, answers whether this machine
+is set up to run MCShell. It works from any session. It prints:
+- a header for bug reports;
+- the setup: the instance, the pinned mods, the jar, the world it boots into,
+  a Microsoft account, the session entry, the units;
+- every dependency in three tiers, each saying what its absence costs.
+
+Measured on this machine, from Hyprland: *Ready*, with one feature missing,
+`wlr-randr`. That one is real: it is not installed, and the boot background
+falls back without it. Every one of these deliberate breaks was caught and
+named, with exit status 1:
+- no instance, and no units;
+- a near-empty `PATH`, and a `$TERMINAL` naming nothing;
+- a mod jar with one byte changed, and a hand-edited unit;
+- a chosen world that is gone (reported as the fallback the launcher really
+  takes), and no world at all.
+
+Inside an MCShell session it appends `diagnose.sh`. Measured 2026-10-18 from
+the live session: *Ready. Nothing missing.*, then all six of diagnose's
+sections.
+
+1. From any terminal: `bin/mcshell check`. **Expect** the header, *Setup* all
+   ok, *Required* all ok, and `Ready. 1 feature(s) unavailable.` (wlr-randr).
+   `echo $?` prints 0.
+2. A control you can undo: `sudo pacman -S wlr-randr`, run it again, and
+   **expect** `Ready. Nothing missing.`
+3. Inside the MCShell session, from a terminal (`$mod+Shift+Return`):
+   `bin/mcshell check`. **Expect** the same report with `session  inside
+   MCShell`, then *The running session (session/diagnose.sh)* with windows,
+   units and the mod jar.
+4. Optional: `ln -s ~/dev/mcshell/bin/mcshell ~/.local/bin/mcshell`, then plain
+   `mcshell check` from any directory.
+
+## Step 4: the second-machine test
+
+The acceptance test for everything above. **A clean Arch install that
+follows `README.md` literally and ends up in a working session.** Every point
+where you needed to know something the README does not say is a bug, in the
+README or in a script. Write each one down; that list is the result.
+
+**The machine.** A VM on the Windows desktop is fine for the first run. This
+tests the install, not the hardware; the laptop comes later for that.
+- **Hypervisor:** VMware Workstation Pro, for its guest 3D. Minecraft needs
+  OpenGL. VirtualBox's 3D is shakier, and Hyper-V has none.
+- **VM settings:** UEFI, 4+ cores, 8 GB RAM, 40 GB disk, 3D acceleration on,
+  NAT, one display.
+- **Arch:** `archinstall` with a desktop profile that brings GDM (GNOME), and
+  a normal user. **Snapshot the VM at its first desktop.** Every retest
+  starts from that snapshot.
+
+**The code.** From the public repository on, the README's clone line as
+written. Before it, while the repository was private, two things differed
+from the README's step 2:
+- **The branch.** GitHub's default branch is `m8-polish`, so a plain clone
+  gets code with no `bin/mcshell`. Add `-b m9-production`.
+- **Signing in.** A private repo asks for a username and password, and GitHub
+  refuses an account password over HTTPS. Make a token first: GitHub →
+  *Settings → Developer settings → Personal access tokens → Fine-grained*,
+  only this repository, *Contents: Read-only*. Paste it as the password.
+
+First, on this machine, push whatever the VM should test:
+
+```bash
+git push origin m9-production
+```
+
+Then in README step 2 on the VM, run instead:
+
+```bash
+git clone -b m9-production https://github.com/novaa1351/mcshell.git ~/mcshell
+cd ~/mcshell
+```
+
+Everything else is the README, word for word.
+
+**Run it.** Follow the README from step 1, with one addition: run
+`bin/mcshell check` once **straight after step 2**, before step 3. Not
+earlier: cloning needs `git` and the check needs `python3`, and step 1 is what
+installs them. **Expect** exactly what steps 3–6 will fix, and nothing else.
+Measured with a fresh clone and an empty home on this machine:
+- six `MISSING`: the daemon's Python modules and the daemon (step 3), the
+  Prism instance (step 4), a Microsoft account (step 5), and the session
+  entry and the units (step 6);
+- one `lost`, dbus-next, which step 3 also fixes.
+
+Anything else in that list is a finding. Save the output, and the output of
+README step 7.
+
+**In the session.** It will be slow; a virtual GPU is weak. Judge whether
+things work, not how fast:
+- the boot screen, then straight into Tutorial World;
+- the catalog: launch an app, put it in a slot, Super back to the game;
+- a toast: `notify-send hi` in chat;
+- the volume bar: `wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+` in chat,
+  standing in for the media keys a desktop keyboard may not have;
+- the lock screen (`$mod+Shift+l`), and *Save and Quit* → *Power Off*.
+  Afterwards, the world should still have what you built.
+
+**What a VM changes, so it is not mistaken for a bug:**
+- **3D acceleration off sends you back to the login screen.** Measured on the
+  first run: picking MCShell and typing the password returned to the user
+  list, and GNOME still logged in. Turning it on got past that.
+- **sway draws in software on VMware's GPU, by itself.** `session.log` says
+  `VMware GPU (vmwgfx): WLR_RENDERER=pixman`. Without that, the session stops
+  at the boot screen and the game dies with `XIO: fatal IO error 22`
+  (`docs/design/boot.md`). Expect a slower game; it renders on llvmpipe.
+- **Super may go to Windows.** Run the VM full screen. If Super still does not
+  arrive, it is the host's. Ctrl+Alt releases VMware's grab and is unused by
+  the session.
+- **The camera may not turn.** Minecraft needs relative mouse motion, and VMs
+  give an absolute pointer. Set VMware's *Preferences → Input → Optimize mouse
+  for games* to *Always* before judging the camera or the pointer handshake.
+- **No battery, backlight, Wi-Fi or Bluetooth.** Those paths are the point
+  here. **Expect** no XP gauge at all, no brightness row, and the Network page
+  showing only the wired port. Your laptop has never exercised any of these.
+- **Skip Sleep.** Suspend in a VM is unreliable.
+
+**Bring back:**
+- both check outputs;
+- `~/.local/state/mcshell/session.log`;
+- `journalctl --user -u mcshelld -u mcshell-client`;
+- the list of README deviations;
+- a few screenshots (F2 saves to `~/Pictures/Screenshots`).
+
+Then restore the snapshot. **Done means** one pass from the snapshot with
+nothing needed outside the README.

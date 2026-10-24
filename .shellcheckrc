@@ -1,0 +1,4 @@
+# `CDPATH= cd -- "$(dirname -- "$0")"` is how every script here finds itself:
+# CDPATH emptied for that one command, so cd neither prints nor wanders.
+# SC1007 reads it as a botched assignment.
+disable=SC1007

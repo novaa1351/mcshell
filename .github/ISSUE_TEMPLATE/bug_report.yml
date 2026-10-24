@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in MCShell doesn't work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Output of `mcshell check`
+      description: Run `bin/mcshell check` in the checkout and paste everything it prints.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: diagnose
+    attributes:
+      label: Output of `mcshell diagnose`
+      description: If MCShell starts, run `bin/mcshell diagnose` inside it (a terminal is Super+Shift+Return).
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        If MCShell won't start or something crashed: `~/.local/state/mcshell/session.log`,
+        and `journalctl --user -u mcshelld -u mcshell-client -b`.
+      render: text
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: Laptop or desktop, GPU, and whether it's a VM.
+      placeholder: "Desktop, AMD RX 6600, not a VM"

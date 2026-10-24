@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=MCShell
+Comment=Minecraft as the desktop shell
+Exec=@REPO@/session/start-session.sh
+Type=Application
+DesktopNames=sway;wlroots;mcshell

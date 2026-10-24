@@ -1,0 +1,65 @@
+# A tag `vX.Y.Z` makes a GitHub release with three files and their sums:
+#
+#   mcshell-X.Y.Z.jar       the Fabric mod
+#   mcshell-X.Y.Z.mrpack    the Prism instance, as `mcshell setup` makes it
+#   mcshell-X.Y.Z.tar.gz    the source, as `git archive` has it at the tag
+#
+# The tag has to agree with mod_version in mod/gradle.properties, or nothing
+# is published: a release whose files call themselves another version is
+# worse than no release.
+#
+#   git tag -a v0.1.0 -m "MCShell 0.1.0" && git push origin v0.1.0
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag matches mod_version
+        id: version
+        run: |
+          version=$(sed -n 's/^mod_version=//p' mod/gradle.properties)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME, but mod/gradle.properties says $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: mod/gradlew -p mod --console=plain build
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # Downloads the pinned mods from Modrinth and checks each sha512
+      # against session/prism/mods.tsv before it goes in the pack.
+      - run: python session/prism/mrpack.py
+      - name: Source tarball, and the sums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git archive --format=tar.gz --prefix="mcshell-$VERSION/" \
+            -o "dist/mcshell-$VERSION.tar.gz" "$GITHUB_REF_NAME"
+          cp "mod/build/libs/mcshell-$VERSION.jar" dist/
+          (cd dist && sha256sum mcshell-* >SHA256SUMS && cat SHA256SUMS)
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: MCShell ${{ steps.version.outputs.version }}
+          files: |
+            dist/mcshell-${{ steps.version.outputs.version }}.jar
+            dist/mcshell-${{ steps.version.outputs.version }}.mrpack
+            dist/mcshell-${{ steps.version.outputs.version }}.tar.gz
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true

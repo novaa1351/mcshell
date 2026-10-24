@@ -1,0 +1,15 @@
+# Lint for CI: bugs, not style. ruff's classic default — pyflakes, and the
+# pycodestyle errors that are about meaning rather than layout — pinned here
+# because ruff's own defaults have since grown, and a new ruff release should
+# not be able to fail a build that nothing in this repo changed.
+# The version is pinned in .github/workflows/ci.yml.
+
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
+
+[lint.per-file-ignores]
+# dbus-next's method signatures are D-Bus type strings written as
+# annotations ("s", "as", "a{sv}"), which pyflakes reads as Python names.
+"daemon/mcshelld/notify.py" = ["F821", "F722"]

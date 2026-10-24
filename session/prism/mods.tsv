@@ -1,0 +1,17 @@
+# Performance mods for the Prism instance, pinned.
+#
+# CLAUDE.md names these four; Fabric API is here because the mod requires it.
+# Columns: filename, sha512, url. Tab-separated, # starts a comment.
+#
+# Pinned rather than tracked, for the same reason Minecraft is: this is a
+# login session, and "it worked yesterday" has to keep meaning something.
+# Bumping one is an edit to this file — get the new sha512 from Modrinth's
+# API, not from the file you just downloaded, which proves nothing.
+#
+# Fabric API is pinned to the version mod/gradle.properties builds against,
+# so the mod runs against the API it compiled against.
+fabric-api-0.116.15+1.21.1.jar	d5dcf28a05676b1436f7ccce76e2f36495ab058f7c3b6f87a5b5cf5abaaf943ef7f37cd4ce72ff1080965a3d11899cd0bf11121e49c4a651daca20f6338043f7	https://cdn.modrinth.com/data/P7dR8mSH/versions/Nlt8gI9z/fabric-api-0.116.15%2B1.21.1.jar
+sodium-fabric-0.8.13+mc1.21.1.jar	8614a374593698069a80ac74de8cd9c28f3928d16819a0e0d6320b538e823f7e54e8be06d5ea5a9c268beb0e02073209d1f831a02dede851588b972367680853	https://cdn.modrinth.com/data/AANobbMI/versions/SMxNOGZ6/sodium-fabric-0.8.13%2Bmc1.21.1.jar
+lithium-fabric-0.15.4+mc1.21.1.jar	182064b00e6315e2255b857eaab8eb759e6b042ebd4cc8b855ff0d93f875a5a7188fac49f878d7b29d4ef7e6b6341190ad7f6f6f39f4a6d2c62003468b08e4c6	https://cdn.modrinth.com/data/gvQqBUqZ/versions/N08Z8wog/lithium-fabric-0.15.4%2Bmc1.21.1.jar
+ferritecore-7.0.3-fabric.jar	3ad31620fac4ff44327dc7dedbe162b2d978f3f246dc16255a6e400ce9592a0d326fe36a626f3c1bf30a11f813093cbb4dcc107af039cff724d0cdf648541fdf	https://cdn.modrinth.com/data/uXXizFIs/versions/sOzRw3CG/ferritecore-7.0.3-fabric.jar
+modernfix-fabric-5.25.1+mc1.21.1.jar	dc67d6e023e1fcdeaf7837917c477cba212c611dfc2463c6ea021319c644087c79b477e0ea8194e113ddd7332fd5c6d82baa47c291eaac7f4a86252507b4e19f	https://cdn.modrinth.com/data/nmDcB62a/versions/NnNX8LBn/modernfix-fabric-5.25.1%2Bmc1.21.1.jar

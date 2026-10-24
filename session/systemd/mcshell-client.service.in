@@ -1,0 +1,33 @@
+[Unit]
+Description=MCShell Minecraft client
+Documentation=file://@REPO@/docs/testing.md
+PartOf=mcshell-session.target
+
+# The client reconnects on its own with backoff, so this is a preference about
+# start order and not a requirement.
+Wants=mcshelld.service
+After=mcshelld.service
+
+[Service]
+Type=simple
+
+# Wait for the boot screen to be on the screen before starting the game.
+# `After=` above is not enough on its own: Type=simple means "started" is
+# "forked", so it buys about two milliseconds, and Prism's launcher window
+# would otherwise appear before the shell has anything to cover it with. The
+# script gives up after eight seconds, so a boot screen that never comes costs
+# a few seconds once rather than a session that never starts.
+ExecStartPre=@REPO@/session/prism/wait-for-boot-screen.sh
+ExecStart=@REPO@/session/prism/launch.sh
+
+# Restart a crash, but not a quit. Choosing "Save and Quit" from the game exits
+# 0 and is a thing someone meant to do; the way back is $mod+Shift+m, which is
+# a compositor binding and works with everything else dead.
+Restart=on-failure
+RestartSec=2
+
+# Prism keeps the game as a child process, so stopping the unit has to reach
+# the whole group or Minecraft outlives the logout still holding session.lock.
+KillMode=mixed
+TimeoutStopSec=20
+

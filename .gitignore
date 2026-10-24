@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+mod/build/
+mod/.gradle/
+mod/run/
+
+# daemon logs
+*.log
+
+# python packaging
+*.egg-info/
+build/
+dist/
+
+# LibreOffice lock files, left behind when a doc is open in it
+.~lock.*#

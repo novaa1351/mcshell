@@ -1,0 +1,21 @@
+[Unit]
+Description=MCShell daemon
+Documentation=file://@REPO@/CLAUDE.md
+PartOf=mcshell-session.target
+
+[Service]
+Type=simple
+# Where session/ is, for the two things the daemon runs out of it: the
+# overlay and the lock screen. The same name start-session.sh gives sway.
+Environment=MCSHELL_ROOT=@REPO@
+ExecStart=@REPO@/daemon/.venv/bin/mcshelld -v
+
+# CLAUDE.md's rail. The daemon is the only thing that knows how to launch,
+# focus or close a window, so a crash costs the shell its taskbar — and the
+# compositor bindings are deliberately the way back if this ever fails to
+# come up.
+Restart=on-failure
+RestartSec=1
+
+# Logs to the journal rather than to a file: journalctl --user -u mcshelld -f,
+# which $mod+Shift+j opens.

@@ -1,0 +1,24 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "dev.mcshell.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"AccessibilityOptionsScreenMixin",
+		"AdvancementsScreenAccessor",
+		"BuiltinModelItemRendererMixin",
+		"ClientPlayerEntityMixin",
+		"ClientPlayerInteractionManagerMixin",
+		"GameMenuScreenMixin",
+		"HandledScreenAccessor",
+		"InGameHudMixin",
+		"InventoryScreenMixin",
+		"ItemRendererMixin",
+		"MinecraftClientMixin",
+		"ServerPlayerEntityMixin",
+		"StatsScreenAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

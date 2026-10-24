@@ -1,0 +1,80 @@
+# Every push and pull request: the mod builds, the daemon's tests pass, and
+# the Python and shell code passes lint. Each job is one thing that can break
+# on its own, so a red build says which.
+#
+# Tool versions are pinned here and rules in ruff.toml and .shellcheckrc, so a
+# new release of a linter cannot fail a build that nothing in this repo
+# changed. CONTRIBUTING.md has the same commands for running them locally.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  mod:
+    name: Build the mod
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # gradle-wrapper.jar is a binary anybody can send in a pull request;
+      # this checks it against Gradle's published checksums.
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: mod/gradlew -p mod --console=plain build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mcshell-jar
+          path: mod/build/libs/mcshell-*.jar
+          if-no-files-found: error
+
+  daemon:
+    name: Test the daemon (pytest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # Each test runs the real daemon in a private home, with no sway, no
+      # D-Bus and almost nothing on PATH: see daemon/tests/conftest.py.
+      - run: |
+          python -m venv daemon/.venv
+          daemon/.venv/bin/pip install -e 'daemon[test]'
+      - run: daemon/.venv/bin/python -m pytest -q daemon/tests
+
+  python:
+    name: Lint Python (ruff)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # The two scripts without .py are named; ruff only finds *.py itself.
+      - run: pipx run --spec ruff==0.17.1 ruff check . daemon/tools/mcsh mod/tools/mcsrc
+
+  shell:
+    name: Lint shell (shellcheck)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # Every *.sh, and every extensionless file whose shebang is sh or bash,
+      # so a new script is checked without being listed. gradlew is Gradle's.
+      - name: shellcheck
+        run: |
+          files=$(git ls-files | while read -r f; do
+            case $f in
+            mod/gradlew) ;;
+            *.sh) echo "$f" ;;
+            */*.* | *.*) ;;
+            *) head -n1 "$f" | grep -qE '^#!(/usr)?/bin/(env )?(ba|da)?sh( |$)' && echo "$f" ;;
+            esac
+          done)
+          echo "$files"
+          pipx run --spec shellcheck-py==0.11.0.1 shellcheck -S warning $files

@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "mcshell",
+	"version": "${version}",
+	"name": "MCShell",
+	"description": "Minecraft as the control surface for a Sway desktop session. Renders daemon state; makes no decisions of its own.",
+	"authors": ["novaa1351"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["dev.mcshell.MCShellClient"]
+	},
+	"mixins": [
+		{
+			"config": "mcshell.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.0",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,36 @@
+#!/bin/sh
+# mcshell — the shell's own command: one word in front of the scripts a person
+# runs by hand, so a README and a bug report can name commands, not paths.
+#
+# It only dispatches. Each verb is a script that also works on its own, and
+# that stays true: the session must not depend on this file existing.
+#
+# Symlinks are followed, so a link to this from anywhere on PATH finds the
+# checkout it belongs to.
+
+set -u
+
+root=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
+
+usage() {
+	cat <<-EOF
+	usage: mcshell <command>
+
+	  check      is this machine set up to run MCShell, and what is missing
+	  setup      create or update the Prism instance and its worlds
+	  diagnose   what a running MCShell session can see (run it inside one)
+	EOF
+}
+
+command=${1:-}
+[ $# -gt 0 ] && shift
+case "$command" in
+check) exec python3 -I "$root/session/check.py" "$@" ;;
+setup) exec "$root/session/prism/setup.sh" "$@" ;;
+diagnose) exec "$root/session/diagnose.sh" "$@" ;;
+-h | --help | help) usage ;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac
