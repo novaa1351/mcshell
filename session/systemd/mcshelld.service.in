@@ -1,6 +1,6 @@
 [Unit]
 Description=MCShell daemon
-Documentation=file://@REPO@/CLAUDE.md
+Documentation=https://github.com/novaa1351/mcshell
 PartOf=mcshell-session.target
 
 [Service]

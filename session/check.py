@@ -249,7 +249,7 @@ def setup_state() -> None:
     inst = instance_dir()
     made = check(SETUP, (inst / "instance.cfg").exists(), "Prism instance",
                  str(inst) if (inst / "instance.cfg").exists()
-                 else f"none at {inst}: run session/prism/setup.sh")
+                 else f"none at {inst}: run mcshell setup")
     if made:
         try:
             comps = {c["uid"]: c.get("version") for c in
@@ -271,7 +271,7 @@ def setup_state() -> None:
                 bad.append(name)
         check(SETUP, not bad, "pinned mods",
               "all present, hashes match mods.tsv" if not bad else
-              f"missing or changed: {', '.join(bad)} — run session/prism/setup.sh")
+              f"missing or changed: {', '.join(bad)} — run mcshell setup")
         jars = sorted(p.name for p in mods.glob("mcshell-*.jar"))
         check(SETUP, bool(jars), "the MCShell mod", ", ".join(jars) or "not installed in the instance")
 
@@ -291,7 +291,7 @@ def setup_state() -> None:
             what = (f"'{default}' is not" if chosen in ("", default)
                     else f"neither '{chosen}' nor '{default}' is")
             check(SETUP, False, "the world it boots into",
-                  f"{what} in {saves}: run session/prism/setup.sh")
+                  f"{what} in {saves}: run mcshell setup")
 
     accounts = Path.home() / ".local/share/PrismLauncher/accounts.json"
     try:
