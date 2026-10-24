@@ -16,6 +16,7 @@ license=('MIT')
 depends=(
   'sway' 'swaybg' 'swaylock' 'hyprlock' 'polkit-gnome' 'foot'
   'python' 'python-i3ipc' 'python-pyxdg' 'python-dbus-next' 'python-gobject'
+  'python-cairo'  # the overlay draws with it; python-gobject does not pull it in
   'gtk4' 'gtk4-layer-shell'
   'prismlauncher' 'jdk21-openjdk'
   'curl' 'zstd' 'systemd'
@@ -39,6 +40,7 @@ optdepends=(
   'pciutils: the GPU line on the Statistics screen'
   'zenity: sudo and Wi-Fi password prompts, if no ssh-askpass is installed'
   'xdg-desktop-portal-gtk: choosing the notification sound'
+  'gtk3: session/probes/clickprobe.py, the input instrument'
 )
 makedepends=('python-build' 'python-installer' 'python-hatchling')
 source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz"
