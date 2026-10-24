@@ -129,7 +129,8 @@ mcshell/
     ├── design/              # one file per feature: the spec, and why it is so
     ├── m9.md                # the current milestone's plan
     ├── milestones.md        # what M0–M8 were
-    └── testing*.md          # walkthroughs: M0–M7, M8, and M9 onward
+    ├── troubleshooting.md   # for people: the login, the rails, what to read
+    └── testing/             # the sign-off walkthroughs: m0-m7, m8, m9 (current)
 ```
 
 ## Protocol
@@ -422,7 +423,7 @@ apps launched from a nested session open on the host (Prism among them).
 ## Safety rails (M7, but design for them now)
 
 Bound in Sway config so they work even if the daemon and Minecraft are both dead.
-All of these are in `session/sway.conf`; `docs/testing.md` has the full table:
+All of these are in `session/sway.conf`; `docs/troubleshooting.md` has the full table:
 
 ```
 bindsym $mod+Shift+Return exec sh -c 'command -v "${TERMINAL%% *}" >/dev/null && exec $TERMINAL || exec foot'
@@ -472,14 +473,15 @@ hotbar can be real items.
 - **Before changing a feature, read its doc in `docs/design/`.** This file holds
   the rules; those hold the reasons. When a change alters a rule, update the
   doc in the same commit, and the summary here if the summary stops being true.
-- **Testing walkthroughs: `docs/testing.md` is M0–M7 and `docs/testing2.md`
-  is M8; both are closed. Write new ones in `docs/testing3.md`**, which starts
-  at M9 and is the current book. A book that passed is one nobody should have
-  to read past to find the current part.
-  - **One exception, and it matters now:** `docs/testing.md` §*The M7
-    walkthrough — the real session* is still the boot reference — installing
-    the session, the first login, and what to do when it comes up wrong. Closed
-    to new material, not to reading.
+- **Testing walkthroughs live in `docs/testing/`, one book per milestone:
+  `m0-m7.md` and `m8.md` are closed. Write new ones in `m9.md`**, the current
+  book. A book that passed is one nobody should have to read past to find the
+  current part. They are the maintainer's sign-off record, not contributor
+  docs.
+  - **What people need when it comes up wrong is `docs/troubleshooting.md`**:
+    the login, the keys that always work, `diagnose`, the symptom table. It
+    was distilled from the M7 walkthrough and checked against the code on
+    2026-10-24; keep it true when a rail, a log or a failure mode changes.
 - **The daemon is testable with no Minecraft at all.** `daemon/tools/mcsh`
   drives every page and every message; `mcsh <page>` prints one. Reach for it
   before the game, and for anything in `session/` reach for the previews —

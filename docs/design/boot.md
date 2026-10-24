@@ -187,7 +187,7 @@ the game got an OpenGL context and then died with
   the X client and loses the Wayland one; `WLR_RENDERER=pixman` keeps both.
   No setting skips the check, so only a renderer that offers no GPU buffers at
   all works. Then a real login with pixman reached the world, and every check
-  in §Step 4 of `docs/testing3.md` passed.
+  in §Step 4 of `docs/testing/m9.md` passed.
 - **Only that driver.** `start-session.sh` looks at the kernel driver of each
   DRM card and sets `WLR_RENDERER=pixman` when one is `vmwgfx`, and says so in
   `session.log`. Real hardware keeps the GPU: on i915 the same probe gets the
@@ -258,10 +258,9 @@ simply nothing that says so. See the open question below.
   application launched from the shell dumps its stderr, because sway's children
   inherit it. See the gaps.
 - **`session/diagnose.sh` is the first thing to run when it comes up wrong.**
-  `docs/testing.md` §*The M7 walkthrough — the real session* is the boot
-  walkthrough; that book is closed for new material but this part of it is
-  still the reference, including *When it comes up wrong* and the first-login
-  recipe.
+  `docs/troubleshooting.md` is the reference for the login and what to do
+  when it comes up wrong; the M7 walkthrough it came from is
+  `docs/testing/m0-m7.md`.
 - **There is no way to test a login without logging out.** That is the point of
   MCShell being a *second* GDM entry rather than a replacement: a broken config
   costs a session pick, not a login. Nested sway (`sway.dev.conf`) tests the

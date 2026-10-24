@@ -9,7 +9,7 @@ point: read them before changing the thing they describe.
 ## Known gaps, deliberately left
 
 Not forgotten, not blocking, **and not a to-do list**. Each is written up in
-`docs/testing.md`. They are here so that meeting one is recognised rather than
+`docs/testing/m0-m7.md`. They are here so that meeting one is recognised rather than
 rediscovered; picking one up is Nick's call, not an opening move.
 
 - **A window Sway focuses by itself can strand the pointer grab** (M7). The

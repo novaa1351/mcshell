@@ -70,7 +70,7 @@ cfg MaxMemAlloc 1024
 # session while a full collection found 223MB alive. The free ratios make G1
 # shrink toward what is live when it collects, and the periodic collection
 # gives it a reason to while the game sits idle behind a window. Measure with
-# session/probes/footprint.sh, not by reasoning — docs/testing2.md.
+# session/probes/footprint.sh, not by reasoning — docs/testing/m8.md.
 cfg OverrideJavaArgs true
 cfg JvmArgs "-XX:G1PeriodicGCInterval=60000 -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30"
 

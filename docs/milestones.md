@@ -54,11 +54,11 @@ point: read them before changing the thing they describe.
     `install-mod.sh` is the build-and-install step that stops the real session
     quietly testing a stale jar. The instance and the world are made by hand,
     once — Prism has no command line for creating an instance, and a world is
-    easier to make in the game than to synthesise. Recipe in `docs/testing.md`.
+    easier to make in the game than to synthesise. Recipe in `docs/testing/m0-m7.md`.
   - Session plumbing *(done)* — **GDM**, systemd user units, escape hatches. MCShell
     is added as a *second* session entry; Hyprland stays selectable, so a broken
     config costs a session pick rather than a login. `install-session.sh`
-    installs it; `docs/testing.md` walks the first login, and
+    installs it; `docs/testing/m0-m7.md` walks the first login, and
     `session/diagnose.sh` answers what the shell can actually see when it comes
     up wrong.
 
@@ -81,7 +81,7 @@ point: read them before changing the thing they describe.
     that is explicitly about them. A polish session that starts writing install
     docs has stopped polishing.
   - **Done so far, across three sessions.** Each has a spec section above and a
-    walkthrough in `docs/testing2.md`. Read the section before touching the
+    walkthrough in `docs/testing/m8.md`. Read the section before touching the
     thing; the reasons are the point, not the code.
 
     | | |
