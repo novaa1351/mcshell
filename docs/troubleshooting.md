@@ -19,7 +19,12 @@ cat ~/.local/state/mcshell/session.log
 ```
 
 It only holds the last MCShell login. In a VM, the usual cause is 3D
-acceleration being off.
+acceleration being off. If it ends with sway's `Failed to create renderer`,
+sway found no working driver for the GPU, and no Wayland desktop would start
+either. On Nvidia with nouveau, the lines above it say
+`ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)`: newer cards
+run OpenGL through Vulkan there, and the Vulkan driver is a separate package,
+`vulkan-nouveau`.
 
 **If it hangs,** Ctrl+Alt+F3 gives you a text console, which involves none of
 MCShell.
@@ -76,6 +81,8 @@ systemctl --user stop mcshell-session.target
 |---|---|---|
 | MCShell is not on the login screen | The session entry is not installed | `session/install-session.sh` |
 | Back at the login screen after logging in | sway or the session script failed | `~/.local/state/mcshell/session.log` |
+| `session.log` ends with `Failed to create renderer` | No working driver for the GPU | Nvidia with nouveau: `pacman -S vulkan-nouveau`; see *The login* |
+| `mcshell check`: the overlay is lost with `AssertionError` | GTK 4 is newer than GLib (a partial upgrade, as on a live USB); the import shows `undefined symbol` | `pacman -Syu` |
 | Next login fails with a lock error | A game outlived the last logout | `systemctl --user stop mcshell-session.target` |
 | Minecraft small and centred | It started without `DISPLAY` | `mcshell diagnose`, see above |
 | An app takes the keyboard but not clicks, and the camera is frozen | The game kept the pointer when sway focused a window by itself (a known gap) | Super to go back to the game, then open the app from the hotbar |

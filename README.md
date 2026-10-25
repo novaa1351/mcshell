@@ -15,8 +15,11 @@ or Microsoft.
 - Arch Linux
 - A Microsoft account that owns Minecraft: Java Edition
 - One monitor
-- An Intel or AMD GPU (Nvidia's proprietary driver works but isn't supported by Sway)
-- A login screen that shows Wayland sessions (tested with GDM)
+- A GPU with a working driver. Intel and AMD work as they are. Nvidia works
+  with nouveau, the open driver, if `vulkan-nouveau` is installed too (tested
+  on an RTX 4070 SUPER). Nvidia's proprietary driver hasn't been tested
+  driving the screen, and Sway doesn't support it
+- A login screen that shows Wayland sessions (tested with GDM and LightDM)
 
 MCShell is added as an extra session on your login screen. Your current
 desktop is still there if you want to go back.
