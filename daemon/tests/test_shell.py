@@ -26,9 +26,15 @@ def test_output_and_exit_code(client):
     assert (end["code"], end["note"]) == (0, "")
 
 
-def test_stderr_and_a_failing_code(client):
+def test_stderr_and_a_failing_code(daemon, client):
+    # The command bar runs `bash -l`, so the machine's login profile speaks
+    # first, and what it says on stderr is shown too. A GitHub runner's
+    # /etc/profile.d/debuginfod.sh calls `tr` before any PATH is set, which
+    # the sealed PATH lacks. So the test brings noise of its own, and asks
+    # only that the command's line comes after it.
+    (daemon.home / ".bash_profile").write_text("echo 'profile noise' >&2\n")
     _, out, end, _ = run(client, "echo oops >&2; exit 3")
-    assert out["stderr"] == ["oops"]
+    assert out["stderr"][-2:] == ["profile noise", "oops"]
     assert end["code"] == 3
 
 
